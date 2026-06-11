@@ -73,13 +73,24 @@ function formatArea(n?: number): string {
 }
 
 function getOldAggregatedColors() {
-  const vId = diffResult.value?.oldVersionName
-  const v = versions.value.find(x => x.name === vId)
-  if (!v) return []
-  const dist: any[] = []
-  const total = v.snapshot.layers.reduce((s, l) => s + l.patterns.reduce((ss, p) => ss + p.area, 0), 0)
+  const ids = [versionA.value, versionB.value].filter(Boolean)
+  let oldScheme: ProcessScheme | null = null
+  if (ids.length === 2) {
+    const sorted = ids.sort((a, b) => {
+      const va = versions.value.find(v => v.id === a)
+      const vb = versions.value.find(v => v.id === b)
+      return (va?.versionNumber || 0) - (vb?.versionNumber || 0)
+    })
+    const v = versions.value.find(x => x.id === sorted[0])
+    if (v) oldScheme = v.snapshot
+  } else if (ids.length === 1) {
+    const v = versions.value.find(x => x.id === ids[0])
+    if (v) oldScheme = v.snapshot
+  }
+  if (!oldScheme) return []
+  const total = oldScheme.layers.reduce((s, l) => s + l.patterns.reduce((ss, p) => ss + p.area, 0), 0)
   const map = new Map<string, { color: string; colorName: string; area: number }>()
-  v.snapshot.layers.forEach(l => l.patterns.forEach(p => {
+  oldScheme.layers.forEach(l => l.patterns.forEach(p => {
     const key = p.color
     if (!map.has(key)) map.set(key, { color: p.color, colorName: p.color, area: 0 })
     map.get(key)!.area += p.area
@@ -91,11 +102,23 @@ function getOldAggregatedColors() {
 }
 
 function getNewAggregatedColors() {
-  if (!store.activeScheme) return []
-  const dist: any[] = []
-  const total = store.activeScheme.layers.reduce((s, l) => s + l.patterns.reduce((ss, p) => ss + p.area, 0), 0)
+  const ids = [versionA.value, versionB.value].filter(Boolean)
+  let newScheme: ProcessScheme | null = null
+  if (localCompareWithCurrent.value || ids.length < 2) {
+    newScheme = store.activeScheme || null
+  } else {
+    const sorted = ids.sort((a, b) => {
+      const va = versions.value.find(v => v.id === a)
+      const vb = versions.value.find(v => v.id === b)
+      return (va?.versionNumber || 0) - (vb?.versionNumber || 0)
+    })
+    const v = versions.value.find(x => x.id === sorted[1])
+    if (v) newScheme = v.snapshot
+  }
+  if (!newScheme) return []
+  const total = newScheme.layers.reduce((s, l) => s + l.patterns.reduce((ss, p) => ss + p.area, 0), 0)
   const map = new Map<string, { color: string; colorName: string; area: number }>()
-  store.activeScheme.layers.forEach(l => l.patterns.forEach(p => {
+  newScheme.layers.forEach(l => l.patterns.forEach(p => {
     const key = p.color
     if (!map.has(key)) map.set(key, { color: p.color, colorName: p.color, area: 0 })
     map.get(key)!.area += p.area

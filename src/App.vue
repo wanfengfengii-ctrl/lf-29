@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMaskStore } from '@/stores/mask'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import MaskSidebar from './components/MaskSidebar.vue'
 import SchemePanel from './components/SchemePanel.vue'
 import ProcessEditor from './components/ProcessEditor.vue'
@@ -21,6 +21,20 @@ type TabKey =
   | 'preview'
 
 const activeTab = ref<TabKey>('editor')
+const previewTokenFromUrl = ref('')
+
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  const tokenId = params.get('preview')
+  if (tokenId) {
+    const token = store.getPreviewToken(tokenId)
+    if (token) {
+      previewTokenFromUrl.value = tokenId
+      activeTab.value = 'preview'
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }
+})
 
 const diffVersionA = ref('')
 const diffVersionB = ref('')
@@ -185,7 +199,10 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
           <SchemeValidationPanel />
         </template>
         <template v-else-if="activeTab === 'preview'">
-          <SchemePreviewPage />
+          <SchemePreviewPage
+            :preview-token-id="previewTokenFromUrl || undefined"
+            :standalone="!!previewTokenFromUrl"
+          />
         </template>
       </div>
     </main>
@@ -194,7 +211,7 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
   <div v-if="copyPatternModalVisible" class="modal-overlay" @click.self="copyPatternModalVisible = false">
     <div class="modal" style="max-width: 640px;">
       <div class="modal-header">
-        <h3>� 批量复制纹线到新方案</h3>
+        <h3>📋 批量复制纹线到新方案</h3>
         <button class="icon-btn" @click="copyPatternModalVisible = false">✕</button>
       </div>
       <div class="modal-body">
