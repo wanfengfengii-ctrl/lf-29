@@ -9,6 +9,8 @@ import VersionHistoryPanel from './components/VersionHistoryPanel.vue'
 import VersionDiffView from './components/VersionDiffView.vue'
 import SchemeValidationPanel from './components/SchemeValidationPanel.vue'
 import SchemePreviewPage from './components/SchemePreviewPage.vue'
+import CraftTemplateManager from './components/CraftTemplateManager.vue'
+import { useCraftTemplateStore } from '@/stores/craftTemplate'
 
 const store = useMaskStore()
 
@@ -19,6 +21,7 @@ type TabKey =
   | 'diff'
   | 'validation'
   | 'preview'
+  | 'heritage'
 
 const activeTab = ref<TabKey>('editor')
 const previewTokenFromUrl = ref('')
@@ -132,13 +135,20 @@ function executeCopy() {
   }
 }
 
+const craftStore = useCraftTemplateStore()
+
+const craftTemplateBadgeCount = computed(() => {
+  return craftStore.submissions.length > 0 ? String(craftStore.submissions.length) : ''
+})
+
 const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeColor?: string }[] = [
   { key: 'editor', label: '工序编辑', icon: '📝' },
   { key: 'versions', label: '版本历史', icon: '📚' },
   { key: 'diff', label: '差异对比', icon: '🔍' },
   { key: 'comparison', label: '方案比较', icon: '📊' },
   { key: 'validation', label: '异常校验', icon: '🛡️', badge: String(valReport.value.errorCount + valReport.value.warningCount || ''), badgeColor: valReport.value.errorCount > 0 ? '#c0392b' : valReport.value.warningCount > 0 ? '#e67e22' : undefined },
-  { key: 'preview', label: '只读预览', icon: '🔐' }
+  { key: 'preview', label: '只读预览', icon: '🔐' },
+  { key: 'heritage', label: '师承工艺', icon: '🎭', badge: craftTemplateBadgeCount.value, badgeColor: '#b8860b' }
 ]
 </script>
 
@@ -203,6 +213,9 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
             :preview-token-id="previewTokenFromUrl || undefined"
             :standalone="!!previewTokenFromUrl"
           />
+        </template>
+        <template v-else-if="activeTab === 'heritage'">
+          <CraftTemplateManager />
         </template>
       </div>
     </main>

@@ -219,3 +219,146 @@ export interface PreviewComment {
   createdAt: number
   replyTo?: string
 }
+
+export type SchoolStyle = 'jiangxi' | 'guizhou' | 'hunan' | 'sichuan' | 'yunnan' | 'custom'
+
+export const SCHOOL_STYLE_META: Record<SchoolStyle, { label: string; region: string; color: string }> = {
+  jiangxi: { label: '江西傩', region: '赣鄱地区', color: '#8B4513' },
+  guizhou: { label: '贵州傩', region: '黔东南', color: '#4a148c' },
+  hunan: { label: '湖南傩', region: '湘西地区', color: '#c62828' },
+  sichuan: { label: '四川傩', region: '巴蜀地区', color: '#2e7d32' },
+  yunnan: { label: '云南傩', region: '滇西地区', color: '#ef6c00' },
+  custom: { label: '自定义流派', region: '其他', color: '#546e7a' }
+}
+
+export interface ColorTemplate {
+  id: string
+  name: string
+  color: string
+  purpose: string
+  usageArea: string
+  opacity: number
+}
+
+export interface LineSketch {
+  id: string
+  name: string
+  description: string
+  path: string
+  category: 'face_outline' | 'facial_feature' | 'decoration' | 'symbol'
+  referenceImage?: string
+  keyPoints: string
+}
+
+export interface MaterialItem {
+  id: string
+  name: string
+  category: 'wood' | 'paint' | 'tool' | 'accessory' | 'other'
+  specification: string
+  quantity: string
+  notes: string
+  alternative?: string
+}
+
+export interface TemplateProcessStep {
+  id: string
+  order: number
+  layerType: ProcessType
+  customTypeName?: string
+  stepName: string
+  description: string
+  durationMinutes: number
+  difficultyLevel: 1 | 2 | 3 | 4 | 5
+  keyPoints: string[]
+  commonMistakes: string[]
+  qualityStandards: string[]
+  referenceLines: string[]
+  recommendedColors: string[]
+  materials: string[]
+  safetyNotes: string[]
+}
+
+export interface CraftTemplate {
+  id: string
+  name: string
+  school: SchoolStyle
+  customSchoolName?: string
+  maskType: string
+  description: string
+  author: string
+  coverImage?: string
+  createdAt: number
+  updatedAt: number
+  isPublic: boolean
+  tags: string[]
+  version: string
+  processSteps: TemplateProcessStep[]
+  colorTemplates: ColorTemplate[]
+  lineSketches: LineSketch[]
+  materials: MaterialItem[]
+  precautions: string[]
+  culturalBackground: string
+  inheritanceNotes: string
+  usageCount: number
+  rating: number
+}
+
+export interface TeachingSession {
+  id: string
+  templateId: string
+  templateName: string
+  currentStepIndex: number
+  isPlaying: boolean
+  playMode: 'manual' | 'auto'
+  autoPlayInterval: number
+  startTime: number
+  lastUpdateTime: number
+  apprenticeName: string
+  notes: Record<string, string>
+}
+
+export type DeviationType = 'missing_step' | 'extra_step' | 'order_wrong'
+  | 'color_mismatch' | 'area_deviation' | 'material_mismatch'
+  | 'completion_insufficient' | 'pattern_missing' | 'pattern_extra'
+
+export interface DeviationItem {
+  id: string
+  type: DeviationType
+  severity: 'minor' | 'major' | 'critical'
+  targetName: string
+  expected: string
+  actual: string
+  description: string
+  suggestion: string
+  scoreDeduction: number
+}
+
+export interface PracticeSubmission {
+  id: string
+  templateId: string
+  templateName: string
+  apprenticeName: string
+  schemeId: string
+  schemeSnapshot: ProcessScheme
+  submittedAt: number
+  deviations: DeviationItem[]
+  totalScore: number
+  maxScore: number
+  grade: 'excellent' | 'good' | 'pass' | 'fail'
+  feedback: string
+  stepScores: {
+    stepId: string
+    stepName: string
+    score: number
+    maxScore: number
+    issues: string[]
+  }[]
+}
+
+export interface TemplateApplyResult {
+  success: boolean
+  message: string
+  schemeId?: string
+  layersCreated?: number
+  patternsCreated?: number
+}
