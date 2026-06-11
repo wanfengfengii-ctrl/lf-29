@@ -108,3 +108,114 @@ export interface ImportResult {
   message: string
   scheme?: ProcessScheme
 }
+
+export type ChangeType = 'layer_added' | 'layer_removed' | 'layer_modified'
+  | 'pattern_added' | 'pattern_removed' | 'pattern_modified'
+  | 'scheme_modified'
+
+export interface ChangeRecord {
+  type: ChangeType
+  targetType: 'scheme' | 'layer' | 'pattern'
+  targetId: string
+  targetName: string
+  layerId?: string
+  field?: string
+  oldValue?: unknown
+  newValue?: unknown
+  description: string
+}
+
+export interface SchemeVersion {
+  id: string
+  schemeId: string
+  versionNumber: number
+  name: string
+  description: string
+  snapshot: ProcessScheme
+  changes: ChangeRecord[]
+  createdAt: number
+  author: string
+  tags: string[]
+}
+
+export type IssueSeverity = 'error' | 'warning' | 'info'
+export type IssueType = 'missing_process' | 'area_abnormal' | 'too_many_colors'
+  | 'material_conflict' | 'completion_gap' | 'orphan_pattern'
+  | 'low_opacity' | 'batch_missing'
+
+export interface SchemeIssue {
+  id: string
+  type: IssueType
+  severity: IssueSeverity
+  title: string
+  description: string
+  layerId?: string
+  patternId?: string
+  suggestion?: string
+}
+
+export interface ValidationReport {
+  issues: SchemeIssue[]
+  errorCount: number
+  warningCount: number
+  infoCount: number
+  generatedAt: number
+}
+
+export interface LayerDiff {
+  layerId: string
+  layerName: string
+  status: 'added' | 'removed' | 'modified' | 'unchanged'
+  oldCompletion?: number
+  newCompletion?: number
+  oldMaterial?: string
+  newMaterial?: string
+  patternDiffs: PatternDiff[]
+}
+
+export interface PatternDiff {
+  patternId: string
+  patternName: string
+  status: 'added' | 'removed' | 'modified' | 'unchanged'
+  oldColor?: string
+  newColor?: string
+  oldArea?: number
+  newArea?: number
+  oldOpacity?: number
+  newOpacity?: number
+}
+
+export interface VersionDiff {
+  oldVersionName: string
+  newVersionName: string
+  layerDiffs: LayerDiff[]
+  summary: {
+    layersAdded: number
+    layersRemoved: number
+    layersModified: number
+    patternsAdded: number
+    patternsRemoved: number
+    patternsModified: number
+    totalAreaDiff: number
+    colorsChanged: number
+  }
+}
+
+export interface PreviewToken {
+  id: string
+  schemeId: string
+  maskId: string
+  snapshot: ProcessScheme
+  createdAt: number
+  expiresAt: number | null
+  author: string
+  comments: PreviewComment[]
+}
+
+export interface PreviewComment {
+  id: string
+  author: string
+  content: string
+  createdAt: number
+  replyTo?: string
+}
