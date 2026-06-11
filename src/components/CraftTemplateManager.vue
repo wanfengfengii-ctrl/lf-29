@@ -35,6 +35,7 @@ const applyResult = ref<{ success: boolean; message: string } | null>(null)
 
 const practiceApprenticeName = ref('学徒' + Math.floor(Math.random() * 1000))
 const practiceSchemeId = ref('')
+const practiceSubmitError = ref('')
 
 const schoolFilter = ref<SchoolStyle | 'all'>('all')
 
@@ -84,7 +85,6 @@ function handleApply() {
   )
   applyResult.value = { success: result.success, message: result.message }
   if (result.success && result.schemeId) {
-    maskStore.setActiveMask(applyTargetMaskId.value)
     maskStore.switchScheme(result.schemeId)
   }
 }
@@ -94,22 +94,42 @@ function openTeachingModal(templateId: string) {
   teachingModalVisible.value = true
 }
 
+function onTeachingSubmitPractice(templateId: string) {
+  store.setActiveTemplate(templateId)
+  teachingModalVisible.value = false
+  practiceSchemeId.value = maskStore.activeScheme?.id || ''
+  practiceSubmitError.value = ''
+  practiceModalVisible.value = true
+}
+
 function openPracticeModal(templateId: string) {
   store.setActiveTemplate(templateId)
   practiceSchemeId.value = maskStore.activeScheme?.id || ''
+  practiceSubmitError.value = ''
   practiceModalVisible.value = true
 }
 
 function handleSubmitPractice() {
-  if (!store.activeTemplateId || !practiceSchemeId.value) return
+  practiceSubmitError.value = ''
+  if (!store.activeTemplateId) {
+    practiceSubmitError.value = '请先选择一个工艺模板'
+    return
+  }
+  if (!practiceSchemeId.value) {
+    practiceSubmitError.value = '请选择要评分的练习方案'
+    return
+  }
   const submission = store.submitPractice(
     store.activeTemplateId,
     practiceSchemeId.value,
     practiceApprenticeName.value.trim() || '匿名学徒'
   )
-  if (submission) {
-    practiceModalVisible.value = false
+  if (!submission) {
+    practiceSubmitError.value = '提交失败：方案不存在或数据异常，请确认方案后重试'
+    return
   }
+  practiceModalVisible.value = false
+  subTab.value = 'practice'
 }
 
 const lineCategoryLabel: Record<LineSketch['category'], string> = {
@@ -692,7 +712,7 @@ const difficultyStars = (level: number) => '★'.repeat(level) + '☆'.repeat(5 
           <button class="icon-btn" @click="teachingModalVisible = false">✕</button>
         </div>
         <div class="modal-body" style="padding: 12px">
-          <TeachingModeView />
+          <TeachingModeView @submit-practice="onTeachingSubmitPractice" />
         </div>
       </div>
     </div>
@@ -730,13 +750,16 @@ const difficultyStars = (level: number) => '★'.repeat(level) + '☆'.repeat(5 
           <div class="text-small text-muted" style="color: #8b4513">
             💡 系统将自动比对工序顺序、完成度、配色、纹线等指标，生成偏差分析报告与评分结果
           </div>
+          <div v-if="practiceSubmitError" class="validation-alert error mt-12">
+            ⚠️ {{ practiceSubmitError }}
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="practiceModalVisible = false">取消</button>
           <button
             class="btn btn-primary"
             :disabled="!practiceSchemeId"
-            @click="handleSubmitPractice; practiceModalVisible = false; subTab = 'practice'"
+            @click="handleSubmitPractice"
           >
             提交并评分
           </button>

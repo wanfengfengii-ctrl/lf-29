@@ -658,6 +658,8 @@ export const useCraftTemplateStore = defineStore('craftTemplate', () => {
       return { success: false, message: '面具不存在' }
     }
 
+    maskStore.setActiveMask(maskId)
+
     const scheme = maskStore.createScheme(schemeName || `套用·${template.name}`)
     if (!scheme) {
       return { success: false, message: '创建方案失败' }
@@ -709,10 +711,12 @@ export const useCraftTemplateStore = defineStore('craftTemplate', () => {
 
     return {
       success: true,
-      message: `成功套用模板「${template.name}」，已创建 ${layersCreated} 个工序，${patternsCreated} 条纹线`,
+      message: `已在「${mask.name}」成功套用模板「${template.name}」，已创建 ${layersCreated} 个工序，${patternsCreated} 条纹线`,
       schemeId: scheme.id,
       layersCreated,
-      patternsCreated
+      patternsCreated,
+      maskId,
+      maskName: mask.name
     }
   }
 

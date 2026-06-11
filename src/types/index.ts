@@ -361,4 +361,6 @@ export interface TemplateApplyResult {
   schemeId?: string
   layersCreated?: number
   patternsCreated?: number
+  maskId?: string
+  maskName?: string
 }

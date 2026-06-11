@@ -3,6 +3,10 @@ import { useCraftTemplateStore } from '@/stores/craftTemplate'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { SCHOOL_STYLE_META, PROCESS_TYPE_META } from '@/types'
 
+const emit = defineEmits<{
+  (e: 'submit-practice', templateId: string): void
+}>()
+
 const store = useCraftTemplateStore()
 
 const apprenticeName = ref('学徒')
@@ -345,7 +349,13 @@ const formatDuration = (m: number) => m >= 60 ? `${Math.floor(m / 60)}h${m % 60 
             <button class="btn btn-secondary" @click="store.goToStep(currentSession.id, 0)">
               🔄 再学一遍
             </button>
-            <button class="btn btn-primary" @click="() => { window.dispatchEvent(new CustomEvent('switch-to-practice')) }">
+            <button
+              class="btn btn-primary"
+              @click="() => {
+                const tid = currentTemplate?.id || store.activeTemplateId
+                if (tid) emit('submit-practice', tid)
+              }"
+            >
               📝 提交练习评分
             </button>
           </div>
