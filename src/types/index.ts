@@ -364,3 +364,192 @@ export interface TemplateApplyResult {
   maskId?: string
   maskName?: string
 }
+
+export type ReviewStatus = 'pending' | 'submitted' | 'under_review' | 'accepted' | 'rejected' | 'archived'
+export type ReviewType = 'process_step' | 'scheme' | 'template' | 'practice'
+export type RejectionCategory = 'technique' | 'material' | 'color' | 'pattern' | 'order' | 'other'
+
+export interface RejectionRecord {
+  id: string
+  reviewer: string
+  category: RejectionCategory
+  reason: string
+  suggestions: string[]
+  rejectedAt: number
+}
+
+export interface ReReviewResult {
+  id: string
+  reviewer: string
+  result: 'pass' | 'fail'
+  comments: string
+  reviewedAt: number
+}
+
+export interface MasterComment {
+  id: string
+  reviewer: string
+  content: string
+  rating: number
+  highlights: string[]
+  improvements: string[]
+  createdAt: number
+  replies?: {
+    id: string
+    author: string
+    content: string
+    createdAt: number
+  }[]
+}
+
+export interface StageAcceptance {
+  id: string
+  stepId: string
+  stepName: string
+  layerType: ProcessType
+  status: 'pending' | 'submitted' | 'accepted' | 'rejected'
+  submittedAt?: number
+  reviewedAt?: number
+  reviewer?: string
+  acceptanceCriteria: string[]
+  actualResults: string[]
+  comments: string
+  rejections: RejectionRecord[]
+  reReviews: ReReviewResult[]
+}
+
+export interface ModificationTrack {
+  id: string
+  targetType: 'scheme' | 'layer' | 'pattern'
+  targetId: string
+  targetName: string
+  description: string
+  changeType: 'add' | 'modify' | 'remove'
+  oldValue?: string
+  newValue?: string
+  author: string
+  createdAt: number
+  status: 'pending' | 'in_progress' | 'completed' | 'verified'
+  verifiedBy?: string
+  verifiedAt?: number
+}
+
+export interface ReviewRecord {
+  id: string
+  maskId: string
+  maskName: string
+  schemeId: string
+  schemeName: string
+  templateId?: string
+  templateName?: string
+  type: ReviewType
+  status: ReviewStatus
+  currentStageIndex: number
+  submittedAt?: number
+  reviewStartAt?: number
+  completedAt?: number
+  stages: StageAcceptance[]
+  masterComments: MasterComment[]
+  modifications: ModificationTrack[]
+  practiceSubmissionId?: string
+  finalScore?: number
+  finalGrade?: 'excellent' | 'good' | 'pass' | 'fail'
+  reviewConclusion: string
+  createdBy: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ArchiveItem {
+  id: string
+  archiveType: 'scheme' | 'template' | 'practice' | 'review'
+  referenceId: string
+  title: string
+  description: string
+  author: string
+  school?: SchoolStyle
+  tags: string[]
+  version?: string
+  rating?: number
+  usageCount?: number
+  archivedAt: number
+  metadata: Record<string, unknown>
+  snapshot?: unknown
+}
+
+export interface ArchiveSearchQuery {
+  keyword?: string
+  archiveType?: ArchiveItem['archiveType'] | 'all'
+  school?: SchoolStyle | 'all'
+  author?: string
+  dateRange?: { start: number; end: number }
+  ratingRange?: { min: number; max: number }
+  tags?: string[]
+}
+
+export interface InheritanceRecord {
+  id: string
+  type: 'teaching' | 'practice' | 'review' | 'version'
+  title: string
+  description: string
+  timestamp: number
+  operator: string
+  details: Record<string, unknown>
+}
+
+export interface InheritanceArchive {
+  id: string
+  maskId: string
+  maskName: string
+  schemeId: string
+  schemeName: string
+  templateId?: string
+  templateName?: string
+  apprenticeName: string
+  masterName: string
+  createdAt: number
+  completedAt?: number
+  status: 'in_progress' | 'completed'
+  processRecords: {
+    stepId: string
+    stepName: string
+    layerType: ProcessType
+    startedAt: number
+    completedAt?: number
+    notes: string
+    materials: string[]
+    completion: number
+  }[]
+  versionHistory: {
+    versionId: string
+    versionName: string
+    versionNumber: number
+    description: string
+    createdAt: number
+    author: string
+    diffSummary?: string
+  }[]
+  teachingRecords: {
+    sessionId: string
+    startTime: number
+    endTime?: number
+    notes: Record<string, string>
+  }[]
+  practiceRecords: PracticeSubmission[]
+  reviewRecords: ReviewRecord[]
+  teachingContent?: {
+    culturalBackground: string
+    inheritanceNotes: string
+    precautions: string[]
+  }
+  finalEvaluation: {
+    totalScore: number
+    maxScore: number
+    grade: 'excellent' | 'good' | 'pass' | 'fail'
+    strengths: string[]
+    improvements: string[]
+    comments: string
+    evaluatedBy: string
+    evaluatedAt: number
+  } | null
+}

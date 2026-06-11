@@ -16,7 +16,7 @@ import {
 const store = useCraftTemplateStore()
 const maskStore = useMaskStore()
 
-type SubTab = 'list' | 'detail' | 'apply' | 'teaching' | 'practice'
+type SubTab = 'list' | 'detail' | 'apply' | 'teaching' | 'practice' | 'review' | 'archive' | 'inheritance'
 const subTab = ref<SubTab>('list')
 
 const createModalVisible = ref(false)
@@ -159,7 +159,10 @@ const difficultyStars = (level: number) => '★'.repeat(level) + '☆'.repeat(5 
           { k: 'detail', label: '模板详情', icon: '📋' },
           { k: 'apply', label: '一键套用', icon: '✨' },
           { k: 'teaching', label: '教学演示', icon: '🎓' },
-          { k: 'practice', label: '练习评分', icon: '📝' }
+          { k: 'practice', label: '练习评分', icon: '📝' },
+          { k: 'review', label: '工艺评审', icon: '🔍' },
+          { k: 'archive', label: '归档检索', icon: '📚' },
+          { k: 'inheritance', label: '传承档案', icon: '📖' }
         ] as { k: SubTab; label: string; icon: string }[]"
         :key="t.k"
         :class="['sub-tab-btn', { active: subTab === t.k }]"
@@ -610,6 +613,21 @@ const difficultyStars = (level: number) => '★'.repeat(level) + '☆'.repeat(5 
         </div>
         <PracticeScoreView />
       </div>
+
+      <!-- 工艺评审页面 -->
+      <div v-else-if="subTab === 'review'" class="review-page">
+        <ReviewProcessPanel />
+      </div>
+
+      <!-- 归档检索页面 -->
+      <div v-else-if="subTab === 'archive'" class="archive-page">
+        <ArchiveSearchPanel />
+      </div>
+
+      <!-- 传承档案页面 -->
+      <div v-else-if="subTab === 'inheritance'" class="inheritance-page">
+        <InheritanceArchivePanel />
+      </div>
     </div>
 
     <!-- 创建模板 Modal -->
@@ -772,7 +790,10 @@ const difficultyStars = (level: number) => '★'.repeat(level) + '☆'.repeat(5 
 <script lang="ts">
 import TeachingModeView from './TeachingModeView.vue'
 import PracticeScoreView from './PracticeScoreView.vue'
+import ReviewProcessPanel from './ReviewProcessPanel.vue'
+import ArchiveSearchPanel from './ArchiveSearchPanel.vue'
+import InheritanceArchivePanel from './InheritanceArchivePanel.vue'
 export default {
-  components: { TeachingModeView, PracticeScoreView }
+  components: { TeachingModeView, PracticeScoreView, ReviewProcessPanel, ArchiveSearchPanel, InheritanceArchivePanel }
 }
 </script>
