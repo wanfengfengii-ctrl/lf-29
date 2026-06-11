@@ -407,7 +407,7 @@ export interface StageAcceptance {
   stepId: string
   stepName: string
   layerType: ProcessType
-  status: 'pending' | 'submitted' | 'accepted' | 'rejected'
+  status: 'pending' | 'submitted' | 'under_review' | 'accepted' | 'rejected'
   submittedAt?: number
   reviewedAt?: number
   reviewer?: string
@@ -553,3 +553,42 @@ export interface InheritanceArchive {
     evaluatedAt: number
   } | null
 }
+
+export type OperationStatus = 'idle' | 'loading' | 'success' | 'error'
+
+export interface OperationResult<TData = unknown, TError = Error> {
+  success: boolean
+  data?: TData
+  error?: TError
+  message: string
+}
+
+export interface AsyncOperationState<TData = unknown, TError = Error> {
+  status: OperationStatus
+  data: TData | null
+  error: TError | null
+  message: string
+}
+
+export interface ListResult<TItem> {
+  items: TItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface PaginationParams {
+  page?: number
+  pageSize?: number
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface IDWithTimestamp {
+  id: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type EntityStatus = 'draft' | 'active' | 'archived' | 'deleted'
+

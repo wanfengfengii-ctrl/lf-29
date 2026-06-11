@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { generateId, now } from '@/utils/id'
-import { useMaskStore } from '@/stores/mask'
-import { useCraftTemplateStore } from '@/stores/craftTemplate'
+import { useMaskSchemeStore } from './maskScheme'
+import { useCraftTemplateCoreStore } from './craftTemplateCore'
+import { useTeachingPracticeStore } from './teachingPractice'
+import { useExport } from '@/composables'
 import type {
   ReviewRecord,
   StageAcceptance,
@@ -19,8 +21,8 @@ import type {
 } from '@/types'
 
 function createSampleReviewRecords(): ReviewRecord[] {
-  const maskStore = useMaskStore()
-  const templateStore = useCraftTemplateStore()
+  const maskStore = useMaskSchemeStore()
+  const templateStore = useCraftTemplateCoreStore()
   const mask = maskStore.masks[0]
   const scheme = mask?.schemes[0]
   const template = templateStore.templates[0]
@@ -114,7 +116,7 @@ function createSampleReviewRecords(): ReviewRecord[] {
 }
 
 function createSampleArchiveItems(): ArchiveItem[] {
-  const templateStore = useCraftTemplateStore()
+  const templateStore = useCraftTemplateCoreStore()
   const items: ArchiveItem[] = []
 
   templateStore.templates.forEach(template => {
@@ -141,7 +143,7 @@ function createSampleArchiveItems(): ArchiveItem[] {
     })
   })
 
-  const maskStore = useMaskStore()
+  const maskStore = useMaskSchemeStore()
   maskStore.masks.forEach(mask => {
     mask.schemes.forEach(scheme => {
       items.push({
@@ -163,7 +165,8 @@ function createSampleArchiveItems(): ArchiveItem[] {
     })
   })
 
-  templateStore.submissions.forEach(submission => {
+  const practiceStore = useTeachingPracticeStore()
+  practiceStore.submissions.forEach(submission => {
     items.push({
       id: generateId(),
       archiveType: 'practice',
@@ -186,12 +189,238 @@ function createSampleArchiveItems(): ArchiveItem[] {
   return items
 }
 
+function formatInheritanceArchiveAsMarkdown(archive: InheritanceArchive): string {
+  const formatDate = (ts: number) => new Date(ts).toLocaleString('zh-CN')
+  const gradeMap = { excellent: '优秀', good: '良好', pass: '及格', fail: '不及格' }
+
+  let md = `# ${archive.maskName} - 传承档案\n\n`
+  md += `## 基本信息\n\n`
+  md += `- **学徒**: ${archive.apprenticeName}\n`
+  md += `- **指导师傅**: ${archive.masterName}\n`
+  md += `- **面具**: ${archive.maskName}\n`
+  md += `- **方案**: ${archive.schemeName}\n`
+  md += `- **模板**: ${archive.templateName || '自定义'}\n`
+  md += `- **创建时间**: ${formatDate(archive.createdAt)}\n`
+  md += `- **状态**: ${archive.status === 'completed' ? '已完成' : '进行中'}\n`
+  if (archive.completedAt) md += `- **完成时间**: ${formatDate(archive.completedAt)}\n`
+  md += '\n---\n\n'
+
+  if (archive.teachingContent) {
+    md += `## 教学内容\n\n`
+    md += `### 文化背景\n\n${archive.teachingContent.culturalBackground}\n\n`
+    md += `### 传承说明\n\n${archive.teachingContent.inheritanceNotes}\n\n`
+    md += `### 工艺注意事项\n\n`
+    archive.teachingContent.precautions.forEach((p, i) => {
+      md += `${i + 1}. ${p}\n`
+    })
+    md += '\n---\n\n'
+  }
+
+  md += `## 工序过程记录\n\n`
+  archive.processRecords.forEach((record, i) => {
+    md += `### ${i + 1}. ${record.stepName}\n\n`
+    md += `- **工序类型**: ${record.layerType}\n`
+    md += `- **开始时间**: ${formatDate(record.startedAt)}\n`
+    if (record.completedAt) md += `- **完成时间**: ${formatDate(record.completedAt)}\n`
+    md += `- **完成度**: ${record.completion}%\n`
+    md += `- **使用材料**: ${record.materials.join('、') || '无'}\n`
+    if (record.notes) md += `- **备注**: ${record.notes}\n`
+    md += '\n'
+  })
+  md += '---\n\n'
+
+  if (archive.versionHistory.length > 0) {
+    md += `## 版本演变记录\n\n`
+    archive.versionHistory.forEach(v => {
+      md += `### V${v.versionNumber} - ${v.versionName}\n\n`
+      md += `- **作者**: ${v.author}\n`
+      md += `- **创建时间**: ${formatDate(v.createdAt)}\n`
+      md += `- **描述**: ${v.description || '无'}\n`
+      if (v.diffSummary) md += `- **变更摘要**: ${v.diffSummary}\n`
+      md += '\n'
+    })
+    md += '---\n\n'
+  }
+
+  if (archive.practiceRecords.length > 0) {
+    md += `## 练习评分记录\n\n`
+    archive.practiceRecords.forEach((record, i) => {
+      md += `### ${i + 1}. ${record.templateName}\n\n`
+      md += `- **提交时间**: ${formatDate(record.submittedAt)}\n`
+      md += `- **总分**: ${record.totalScore} / ${record.maxScore}\n`
+      md += `- **等级**: ${gradeMap[record.grade]}\n`
+      md += `\n**反馈**:\n\n${record.feedback}\n\n`
+      if (record.stepScores.length > 0) {
+        md += `**各工序得分**:\n\n`
+        record.stepScores.forEach(ss => {
+          md += `- ${ss.stepName}: ${ss.score} / ${ss.maxScore}\n`
+        })
+        md += '\n'
+      }
+    })
+    md += '---\n\n'
+  }
+
+  if (archive.reviewRecords.length > 0) {
+    md += `## 评审记录\n\n`
+    archive.reviewRecords.forEach(review => {
+      md += `### ${review.schemeName}\n\n`
+      md += `- **创建人**: ${review.createdBy}\n`
+      md += `- **提交时间**: ${review.submittedAt ? formatDate(review.submittedAt) : '未提交'}\n`
+      md += `- **状态**: ${review.status}\n`
+      if (review.finalScore !== undefined) {
+        md += `- **最终得分**: ${review.finalScore}\n`
+        md += `- **最终等级**: ${review.finalGrade ? gradeMap[review.finalGrade] : '未评定'}\n`
+      }
+      if (review.reviewConclusion) md += `\n**评审结论**: ${review.reviewConclusion}\n`
+      md += '\n**阶段验收**:\n\n'
+      review.stages.forEach(stage => {
+        const stageStatus = {
+          pending: '待提交',
+          submitted: '已提交待审',
+          under_review: '评审中',
+          accepted: '验收通过',
+          rejected: '验收不通过'
+        }[stage.status]
+        md += `- ${stage.stepName}: ${stageStatus}`
+        if (stage.reviewer) md += ` (评审人: ${stage.reviewer})`
+        md += '\n'
+        if (stage.rejections.length > 0) {
+          stage.rejections.forEach(r => {
+            md += `  - 退回原因: ${r.reason}\n`
+            md += `  - 改进建议:\n`
+            r.suggestions.forEach(s => md += `    - ${s}\n`)
+          })
+        }
+      })
+
+      if (review.masterComments.length > 0) {
+        md += `\n**师傅点评**:\n\n`
+        review.masterComments.forEach((comment, ci) => {
+          md += `#### 点评 ${ci + 1}\n\n`
+          md += `- **点评人**: ${comment.reviewer}\n`
+          md += `- **评分**: ${'★'.repeat(comment.rating)}${'☆'.repeat(5 - comment.rating)}\n`
+          md += `- **时间**: ${formatDate(comment.createdAt)}\n`
+          md += `\n${comment.content}\n\n`
+          if (comment.highlights.length > 0) {
+            md += `**亮点**:\n`
+            comment.highlights.forEach(h => md += `- ${h}\n`)
+            md += '\n'
+          }
+          if (comment.improvements.length > 0) {
+            md += `**改进建议**:\n`
+            comment.improvements.forEach(imp => md += `- ${imp}\n`)
+            md += '\n'
+          }
+        })
+      }
+
+      if (review.modifications.length > 0) {
+        md += `\n**修改意见跟踪**:\n\n`
+        review.modifications.forEach(mod => {
+          const modStatus = {
+            pending: '待处理',
+            in_progress: '处理中',
+            completed: '已完成待验证',
+            verified: '已验证'
+          }[mod.status]
+          md += `- ${mod.targetName} (${modStatus})\n`
+          md += `  - 变更: ${mod.description}\n`
+          if (mod.oldValue) md += `  - 原值: ${mod.oldValue}\n`
+          if (mod.newValue) md += `  - 新值: ${mod.newValue}\n`
+          md += `  - 操作人: ${mod.author}\n`
+        })
+        md += '\n'
+      }
+    })
+    md += '---\n\n'
+  }
+
+  if (archive.finalEvaluation) {
+    md += `## 最终评定\n\n`
+    md += `- **总分**: ${archive.finalEvaluation.totalScore} / ${archive.finalEvaluation.maxScore}\n`
+    md += `- **等级**: ${gradeMap[archive.finalEvaluation.grade]}\n`
+    md += `- **评定人**: ${archive.finalEvaluation.evaluatedBy}\n`
+    md += `- **评定时间**: ${formatDate(archive.finalEvaluation.evaluatedAt)}\n\n`
+
+    if (archive.finalEvaluation.strengths.length > 0) {
+      md += `### 优点\n\n`
+      archive.finalEvaluation.strengths.forEach(s => md += `- ${s}\n`)
+      md += '\n'
+    }
+
+    if (archive.finalEvaluation.improvements.length > 0) {
+      md += `### 待改进\n\n`
+      archive.finalEvaluation.improvements.forEach(i => md += `- ${i}\n`)
+      md += '\n'
+    }
+
+    md += `### 综合评语\n\n${archive.finalEvaluation.comments}\n\n`
+  }
+
+  md += `---\n\n*本档案由傩面具工艺数字化平台自动生成，生成时间: ${formatDate(now())}*\n`
+
+  return md
+}
+
+export interface ReviewArchiveStoreState {
+  reviewRecords: ReviewRecord[]
+  archiveItems: ArchiveItem[]
+  inheritanceArchives: InheritanceArchive[]
+  activeReviewId: string | null
+  initialized: boolean
+}
+
+export interface ReviewArchiveStoreGetters {
+  activeReview: ReviewRecord | null
+  sortedReviews: ReviewRecord[]
+  pendingReviews: ReviewRecord[]
+  completedReviews: ReviewRecord[]
+}
+
+export interface ReviewArchiveStoreActions {
+  ensureInitialized(): void
+  setActiveReview(reviewId: string): void
+  createReview(data: Omit<ReviewRecord, 'id' | 'status' | 'currentStageIndex' | 'stages' | 'masterComments' | 'modifications' | 'reviewConclusion' | 'createdAt' | 'updatedAt'>): ReviewRecord
+  submitReview(reviewId: string): void
+  startReview(reviewId: string, reviewer: string): void
+  submitStageForReview(reviewId: string, stageId: string, actualResults: string[]): void
+  reviewStage(reviewId: string, stageId: string, accepted: boolean, reviewer: string, comments: string, rejection?: { category: RejectionCategory; reason: string; suggestions: string[] }): void
+  resubmitStage(reviewId: string, stageId: string, actualResults: string[]): void
+  reReviewStage(reviewId: string, stageId: string, pass: boolean, reviewer: string, comments: string): void
+  addMasterComment(reviewId: string, reviewer: string, content: string, rating: number, highlights: string[], improvements: string[]): MasterComment | null
+  replyToMasterComment(reviewId: string, commentId: string, author: string, content: string): void
+  addModificationTrack(reviewId: string, data: Omit<ModificationTrack, 'id' | 'createdAt' | 'status'> & { status?: ModificationTrack['status'] }): ModificationTrack | null
+  updateModificationStatus(reviewId: string, modificationId: string, status: ModificationTrack['status'], verifiedBy?: string): void
+  completeReview(reviewId: string, finalScore: number, finalGrade: ReviewRecord['finalGrade'], conclusion: string): void
+  getReviewsByMask(maskId: string): ReviewRecord[]
+  getReviewsByScheme(schemeId: string): ReviewRecord[]
+  getReviewsByTemplate(templateId: string): ReviewRecord[]
+  getReviewsByCreator(creator: string): ReviewRecord[]
+  addToArchive(data: Omit<ArchiveItem, 'id' | 'archivedAt'>): ArchiveItem
+  searchArchive(query: ArchiveSearchQuery): ArchiveItem[]
+  getArchiveByType(type: ArchiveItem['archiveType']): ArchiveItem[]
+  deleteArchiveItem(itemId: string): void
+  createInheritanceArchive(data: Omit<InheritanceArchive, 'id' | 'createdAt' | 'status' | 'processRecords' | 'versionHistory' | 'teachingRecords' | 'practiceRecords' | 'reviewRecords' | 'finalEvaluation'>): InheritanceArchive
+  completeInheritanceArchive(archiveId: string, evaluation: Omit<Exclude<InheritanceArchive['finalEvaluation'], null>, 'evaluatedAt'>): void
+  getInheritanceArchivesByApprentice(apprenticeName: string): InheritanceArchive[]
+  getInheritanceArchivesByMaster(masterName: string): InheritanceArchive[]
+  exportInheritanceArchiveAsMarkdown(archiveId: string): string
+  downloadInheritanceArchive(archiveId: string): void
+  getAllArchiveAuthors(): string[]
+  getAllArchiveTags(): string[]
+}
+
+export type ReviewArchiveStore = ReviewArchiveStoreState & ReviewArchiveStoreGetters & ReviewArchiveStoreActions
+
 export const useReviewArchiveStore = defineStore('reviewArchive', () => {
   const reviewRecords = ref<ReviewRecord[]>([])
   const archiveItems = ref<ArchiveItem[]>([])
   const inheritanceArchives = ref<InheritanceArchive[]>([])
   const activeReviewId = ref<string | null>(null)
   const initialized = ref(false)
+
+  const { exportAsMarkdown, safeFilename, formatDateFilename } = useExport()
 
   const activeReview = computed<ReviewRecord | null>(() => {
     return reviewRecords.value.find(r => r.id === activeReviewId.value) || null
@@ -228,8 +457,8 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
     data: Omit<ReviewRecord, 'id' | 'status' | 'currentStageIndex' | 'stages' | 'masterComments' | 'modifications' | 'reviewConclusion' | 'createdAt' | 'updatedAt'>
   ): ReviewRecord {
     ensureInitialized()
-    const maskStore = useMaskStore()
-    const templateStore = useCraftTemplateStore()
+    const maskStore = useMaskSchemeStore()
+    const templateStore = useCraftTemplateCoreStore()
 
     const scheme = maskStore.findSchemeById(data.schemeId)
     const template = data.templateId ? templateStore.templates.find(t => t.id === data.templateId) : null
@@ -309,7 +538,6 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
       description: `提交时间: ${new Date(review.submittedAt!).toLocaleString()}`,
       author: review.createdBy,
       tags: ['评审', review.maskName, review.schemeName],
-      archivedAt: now(),
       metadata: {
         type: review.type,
         stageCount: review.stages.length
@@ -662,8 +890,10 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
     data: Omit<InheritanceArchive, 'id' | 'createdAt' | 'status' | 'processRecords' | 'versionHistory' | 'teachingRecords' | 'practiceRecords' | 'reviewRecords' | 'finalEvaluation'>
   ): InheritanceArchive {
     ensureInitialized()
-    const maskStore = useMaskStore()
-    const templateStore = useCraftTemplateStore()
+    const maskStore = useMaskSchemeStore()
+    const templateStore = useCraftTemplateCoreStore()
+    const versionStore = (useMaskSchemeStore as unknown as { getVersionsByScheme?: (id: string) => unknown[] })
+    const versionFn = (maskStore as unknown as { getVersionsByScheme?: (id: string) => unknown[] }).getVersionsByScheme
 
     const mask = maskStore.masks.find(m => m.id === data.maskId)
     const scheme = mask?.schemes.find(s => s.id === data.schemeId)
@@ -689,8 +919,8 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
     }
 
     const versionHistory: InheritanceArchive['versionHistory'] = []
-    if (scheme) {
-      const versions = maskStore.getVersionsByScheme(scheme.id)
+    if (scheme && versionFn) {
+      const versions = versionFn(scheme.id) as { id: string; name: string; versionNumber: number; description: string; createdAt: number; author: string; changes: { length: number } }[]
       versions.forEach(v => {
         versionHistory.push({
           versionId: v.id,
@@ -704,7 +934,8 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
       })
     }
 
-    const practiceRecords = templateStore.submissions.filter(s => s.schemeId === data.schemeId)
+    const practiceStore = useTeachingPracticeStore()
+    const practiceRecords = practiceStore.submissions.filter(s => s.schemeId === data.schemeId)
     const reviewRecordsFiltered = reviewRecords.value.filter(r => r.schemeId === data.schemeId)
 
     const archive: InheritanceArchive = {
@@ -734,7 +965,6 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
       description: `师傅: ${archive.masterName}`,
       author: archive.apprenticeName,
       tags: ['传承档案', archive.maskName, archive.apprenticeName, archive.masterName],
-      archivedAt: now(),
       metadata: {
         processCount: archive.processRecords.length,
         versionCount: archive.versionHistory.length,
@@ -749,7 +979,7 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
 
   function completeInheritanceArchive(
     archiveId: string,
-    evaluation: Omit<InheritanceArchive['finalEvaluation'], 'evaluatedAt'>
+    evaluation: Omit<Exclude<InheritanceArchive['finalEvaluation'], null>, 'evaluatedAt'>
   ) {
     ensureInitialized()
     const archive = inheritanceArchives.value.find(a => a.id === archiveId)
@@ -781,194 +1011,14 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
     ensureInitialized()
     const archive = inheritanceArchives.value.find(a => a.id === archiveId)
     if (!archive) return ''
-
-    const formatDate = (ts: number) => new Date(ts).toLocaleString('zh-CN')
-    const gradeMap = { excellent: '优秀', good: '良好', pass: '及格', fail: '不及格' }
-
-    let md = `# ${archive.maskName} - 传承档案\n\n`
-    md += `## 基本信息\n\n`
-    md += `- **学徒**: ${archive.apprenticeName}\n`
-    md += `- **指导师傅**: ${archive.masterName}\n`
-    md += `- **面具**: ${archive.maskName}\n`
-    md += `- **方案**: ${archive.schemeName}\n`
-    md += `- **模板**: ${archive.templateName || '自定义'}\n`
-    md += `- **创建时间**: ${formatDate(archive.createdAt)}\n`
-    md += `- **状态**: ${archive.status === 'completed' ? '已完成' : '进行中'}\n`
-    if (archive.completedAt) md += `- **完成时间**: ${formatDate(archive.completedAt)}\n`
-    md += '\n---\n\n'
-
-    if (archive.teachingContent) {
-      md += `## 教学内容\n\n`
-      md += `### 文化背景\n\n${archive.teachingContent.culturalBackground}\n\n`
-      md += `### 传承说明\n\n${archive.teachingContent.inheritanceNotes}\n\n`
-      md += `### 工艺注意事项\n\n`
-      archive.teachingContent.precautions.forEach((p, i) => {
-        md += `${i + 1}. ${p}\n`
-      })
-      md += '\n---\n\n'
-    }
-
-    md += `## 工序过程记录\n\n`
-    archive.processRecords.forEach((record, i) => {
-      md += `### ${i + 1}. ${record.stepName}\n\n`
-      md += `- **工序类型**: ${record.layerType}\n`
-      md += `- **开始时间**: ${formatDate(record.startedAt)}\n`
-      if (record.completedAt) md += `- **完成时间**: ${formatDate(record.completedAt)}\n`
-      md += `- **完成度**: ${record.completion}%\n`
-      md += `- **使用材料**: ${record.materials.join('、') || '无'}\n`
-      if (record.notes) md += `- **备注**: ${record.notes}\n`
-      md += '\n'
-    })
-    md += '---\n\n'
-
-    if (archive.versionHistory.length > 0) {
-      md += `## 版本演变记录\n\n`
-      archive.versionHistory.forEach(v => {
-        md += `### V${v.versionNumber} - ${v.versionName}\n\n`
-        md += `- **作者**: ${v.author}\n`
-        md += `- **创建时间**: ${formatDate(v.createdAt)}\n`
-        md += `- **描述**: ${v.description || '无'}\n`
-        if (v.diffSummary) md += `- **变更摘要**: ${v.diffSummary}\n`
-        md += '\n'
-      })
-      md += '---\n\n'
-    }
-
-    if (archive.practiceRecords.length > 0) {
-      md += `## 练习评分记录\n\n`
-      archive.practiceRecords.forEach((record, i) => {
-        md += `### ${i + 1}. ${record.templateName}\n\n`
-        md += `- **提交时间**: ${formatDate(record.submittedAt)}\n`
-        md += `- **总分**: ${record.totalScore} / ${record.maxScore}\n`
-        md += `- **等级**: ${gradeMap[record.grade]}\n`
-        md += `\n**反馈**:\n\n${record.feedback}\n\n`
-        if (record.stepScores.length > 0) {
-          md += `**各工序得分**:\n\n`
-          record.stepScores.forEach(ss => {
-            md += `- ${ss.stepName}: ${ss.score} / ${ss.maxScore}\n`
-          })
-          md += '\n'
-        }
-      })
-      md += '---\n\n'
-    }
-
-    if (archive.reviewRecords.length > 0) {
-      md += `## 评审记录\n\n`
-      archive.reviewRecords.forEach(review => {
-        md += `### ${review.schemeName}\n\n`
-        md += `- **创建人**: ${review.createdBy}\n`
-        md += `- **提交时间**: ${review.submittedAt ? formatDate(review.submittedAt) : '未提交'}\n`
-        md += `- **状态**: ${review.status}\n`
-        if (review.finalScore !== undefined) {
-          md += `- **最终得分**: ${review.finalScore}\n`
-          md += `- **最终等级**: ${review.finalGrade ? gradeMap[review.finalGrade] : '未评定'}\n`
-        }
-        if (review.reviewConclusion) md += `\n**评审结论**: ${review.reviewConclusion}\n`
-        md += '\n**阶段验收**:\n\n'
-        review.stages.forEach(stage => {
-          const stageStatus = {
-            pending: '待提交',
-            submitted: '已提交待审',
-            under_review: '评审中',
-            accepted: '验收通过',
-            rejected: '验收不通过'
-          }[stage.status]
-          md += `- ${stage.stepName}: ${stageStatus}`
-          if (stage.reviewer) md += ` (评审人: ${stage.reviewer})`
-          md += '\n'
-          if (stage.rejections.length > 0) {
-            stage.rejections.forEach(r => {
-              md += `  - 退回原因: ${r.reason}\n`
-              md += `  - 改进建议:\n`
-              r.suggestions.forEach(s => md += `    - ${s}\n`)
-            })
-          }
-        })
-
-        if (review.masterComments.length > 0) {
-          md += `\n**师傅点评**:\n\n`
-          review.masterComments.forEach((comment, ci) => {
-            md += `#### 点评 ${ci + 1}\n\n`
-            md += `- **点评人**: ${comment.reviewer}\n`
-            md += `- **评分**: ${'★'.repeat(comment.rating)}${'☆'.repeat(5 - comment.rating)}\n`
-            md += `- **时间**: ${formatDate(comment.createdAt)}\n`
-            md += `\n${comment.content}\n\n`
-            if (comment.highlights.length > 0) {
-              md += `**亮点**:\n`
-              comment.highlights.forEach(h => md += `- ${h}\n`)
-              md += '\n'
-            }
-            if (comment.improvements.length > 0) {
-              md += `**改进建议**:\n`
-              comment.improvements.forEach(imp => md += `- ${imp}\n`)
-              md += '\n'
-            }
-          })
-        }
-
-        if (review.modifications.length > 0) {
-          md += `\n**修改意见跟踪**:\n\n`
-          review.modifications.forEach(mod => {
-            const modStatus = {
-              pending: '待处理',
-              in_progress: '处理中',
-              completed: '已完成待验证',
-              verified: '已验证'
-            }[mod.status]
-            md += `- ${mod.targetName} (${modStatus})\n`
-            md += `  - 变更: ${mod.description}\n`
-            if (mod.oldValue) md += `  - 原值: ${mod.oldValue}\n`
-            if (mod.newValue) md += `  - 新值: ${mod.newValue}\n`
-            md += `  - 操作人: ${mod.author}\n`
-          })
-          md += '\n'
-        }
-      })
-      md += '---\n\n'
-    }
-
-    if (archive.finalEvaluation) {
-      md += `## 最终评定\n\n`
-      md += `- **总分**: ${archive.finalEvaluation.totalScore} / ${archive.finalEvaluation.maxScore}\n`
-      md += `- **等级**: ${gradeMap[archive.finalEvaluation.grade]}\n`
-      md += `- **评定人**: ${archive.finalEvaluation.evaluatedBy}\n`
-      md += `- **评定时间**: ${formatDate(archive.finalEvaluation.evaluatedAt)}\n\n`
-
-      if (archive.finalEvaluation.strengths.length > 0) {
-        md += `### 优点\n\n`
-        archive.finalEvaluation.strengths.forEach(s => md += `- ${s}\n`)
-        md += '\n'
-      }
-
-      if (archive.finalEvaluation.improvements.length > 0) {
-        md += `### 待改进\n\n`
-        archive.finalEvaluation.improvements.forEach(i => md += `- ${i}\n`)
-        md += '\n'
-      }
-
-      md += `### 综合评语\n\n${archive.finalEvaluation.comments}\n\n`
-    }
-
-    md += `---\n\n*本档案由傩面具工艺数字化平台自动生成，生成时间: ${formatDate(now())}*\n`
-
-    return md
+    return formatInheritanceArchiveAsMarkdown(archive)
   }
 
   function downloadInheritanceArchive(archiveId: string) {
     const md = exportInheritanceArchiveAsMarkdown(archiveId)
     const archive = inheritanceArchives.value.find(a => a.id === archiveId)
     if (!archive) return
-
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${archive.maskName}_${archive.apprenticeName}_传承档案_${new Date().toISOString().split('T')[0]}.md`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    exportAsMarkdown(md, `${safeFilename(archive.maskName)}_${safeFilename(archive.apprenticeName)}_传承档案_${formatDateFilename()}`)
   }
 
   function getAllArchiveAuthors(): string[] {
@@ -997,6 +1047,8 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
     sortedReviews,
     pendingReviews,
     completedReviews,
+    initialized,
+    ensureInitialized,
     setActiveReview,
     createReview,
     submitReview,
@@ -1025,7 +1077,6 @@ export const useReviewArchiveStore = defineStore('reviewArchive', () => {
     exportInheritanceArchiveAsMarkdown,
     downloadInheritanceArchive,
     getAllArchiveAuthors,
-    getAllArchiveTags,
-    ensureInitialized
+    getAllArchiveTags
   }
 })

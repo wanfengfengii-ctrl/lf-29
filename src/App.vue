@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useMaskStore } from '@/stores/mask'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import MaskSidebar from './components/MaskSidebar.vue'
 import SchemePanel from './components/SchemePanel.vue'
 import ProcessEditor from './components/ProcessEditor.vue'
@@ -11,6 +11,7 @@ import SchemeValidationPanel from './components/SchemeValidationPanel.vue'
 import SchemePreviewPage from './components/SchemePreviewPage.vue'
 import CraftTemplateManager from './components/CraftTemplateManager.vue'
 import { useCraftTemplateStore } from '@/stores/craftTemplate'
+import { useModal, useSubmissionState } from '@/composables'
 
 const store = useMaskStore()
 
@@ -43,12 +44,15 @@ const diffVersionA = ref('')
 const diffVersionB = ref('')
 const diffCompareWithCurrent = ref(false)
 
-const copyPatternModalVisible = ref(false)
-const copySourceVersionId = ref('')
-const copyTargetSchemeId = ref('')
-const copyTargetLayerId = ref('')
-const copyPatternIds = ref<string[]>([])
-const copyResultCount = ref(0)
+const copyPatternsModal = useModal()
+const copyPatternsSubmit = useSubmissionState()
+const copyPatternsState = reactive({
+  sourceVersionId: '',
+  targetSchemeId: '',
+  targetLayerId: '',
+  patternIds: [] as string[],
+  resultCount: 0
+})
 
 const headerSubtitle = computed(() => {
   if (!store.activeMask) return ''
@@ -74,16 +78,17 @@ function openDiffTab(v1Id: string, v2Id?: string) {
 }
 
 function openCopyPatternsModal(versionId: string) {
-  copySourceVersionId.value = versionId
-  copyTargetSchemeId.value = store.activeScheme?.id || ''
-  copyTargetLayerId.value = ''
-  copyPatternIds.value = []
-  copyResultCount.value = 0
-  copyPatternModalVisible.value = true
+  copyPatternsState.sourceVersionId = versionId
+  copyPatternsState.targetSchemeId = store.activeScheme?.id || ''
+  copyPatternsState.targetLayerId = ''
+  copyPatternsState.patternIds = []
+  copyPatternsState.resultCount = 0
+  copyPatternsSubmit.resetSubmit()
+  copyPatternsModal.open()
 }
 
 const sourceVersion = computed(() => {
-  return store.versions.find(v => v.id === copySourceVersionId.value) || null
+  return store.versions.find(v => v.id === copyPatternsState.sourceVersionId) || null
 })
 
 const allPatterns = computed(() => {
@@ -105,33 +110,41 @@ const allPatterns = computed(() => {
 })
 
 function togglePattern(pid: string) {
-  const i = copyPatternIds.value.indexOf(pid)
-  if (i >= 0) copyPatternIds.value.splice(i, 1)
-  else copyPatternIds.value.push(pid)
+  const i = copyPatternsState.patternIds.indexOf(pid)
+  if (i >= 0) copyPatternsState.patternIds.splice(i, 1)
+  else copyPatternsState.patternIds.push(pid)
 }
 
 function selectAllPatterns() {
-  if (copyPatternIds.value.length === allPatterns.value.length) {
-    copyPatternIds.value = []
+  if (copyPatternsState.patternIds.length === allPatterns.value.length) {
+    copyPatternsState.patternIds = []
   } else {
-    copyPatternIds.value = allPatterns.value.map(p => p.id)
+    copyPatternsState.patternIds = allPatterns.value.map(p => p.id)
   }
 }
 
-function executeCopy() {
-  if (!copySourceVersionId.value || !copyTargetSchemeId.value) return
-  const n = store.batchCopyPatternsFromVersion(
-    copySourceVersionId.value,
-    copyTargetSchemeId.value,
-    copyTargetLayerId.value || undefined,
-    copyPatternIds.value.length > 0 ? copyPatternIds.value : undefined
-  )
-  copyResultCount.value = n
-  if (n > 0) {
-    setTimeout(() => {
-      copyPatternModalVisible.value = false
-      activeTab.value = 'editor'
-    }, 1500)
+async function executeCopy() {
+  if (!copyPatternsState.sourceVersionId || !copyPatternsState.targetSchemeId) return
+  copyPatternsSubmit.startSubmit()
+  try {
+    const n = store.batchCopyPatternsFromVersion(
+      copyPatternsState.sourceVersionId,
+      copyPatternsState.targetSchemeId,
+      copyPatternsState.targetLayerId || undefined,
+      copyPatternsState.patternIds.length > 0 ? copyPatternsState.patternIds : undefined
+    )
+    copyPatternsState.resultCount = n
+    if (n > 0) {
+      copyPatternsSubmit.endSubmit(true)
+      setTimeout(() => {
+        copyPatternsModal.close()
+        activeTab.value = 'editor'
+      }, 1500)
+    } else {
+      copyPatternsSubmit.endSubmit(false, '未能复制任何纹线')
+    }
+  } catch (e) {
+    copyPatternsSubmit.endSubmit(false, (e as Error)?.message || '复制失败')
   }
 }
 
@@ -221,15 +234,18 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
     </main>
   </div>
 
-  <div v-if="copyPatternModalVisible" class="modal-overlay" @click.self="copyPatternModalVisible = false">
+  <div v-if="copyPatternsModal.visible.value" class="modal-overlay" @click.self="copyPatternsModal.close()">
     <div class="modal" style="max-width: 640px;">
       <div class="modal-header">
         <h3>📋 批量复制纹线到新方案</h3>
-        <button class="icon-btn" @click="copyPatternModalVisible = false">✕</button>
+        <button class="icon-btn" @click="copyPatternsModal.close()">✕</button>
       </div>
       <div class="modal-body">
-        <div v-if="copyResultCount > 0" class="validation-alert warning">
-          ✅ 成功复制 {{ copyResultCount }} 条纹线，即将跳转到编辑页...
+        <div v-if="copyPatternsSubmit.submitSuccess && copyPatternsState.resultCount > 0" class="validation-alert warning">
+          ✅ 成功复制 {{ copyPatternsState.resultCount }} 条纹线，即将跳转到编辑页...
+        </div>
+        <div v-if="copyPatternsSubmit.submitError" class="validation-alert error">
+          ❌ {{ copyPatternsSubmit.submitError }}
         </div>
 
         <div class="form-item mb-12">
@@ -239,7 +255,7 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
 
         <div class="form-item mb-12">
           <label>目标方案</label>
-          <select v-model="copyTargetSchemeId">
+          <select v-model="copyPatternsState.targetSchemeId">
             <option v-for="s in store.activeMask?.schemes || []" :key="s.id" :value="s.id">
               {{ s.name }}
             </option>
@@ -248,10 +264,10 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
 
         <div class="form-item mb-12">
           <label>目标工序（可选，留空则按工序类型自动匹配/创建）</label>
-          <select v-model="copyTargetLayerId">
+          <select v-model="copyPatternsState.targetLayerId">
             <option value="">-- 自动匹配或新建工序 --</option>
             <template v-for="s in store.activeMask?.schemes || []" :key="s.id">
-              <optgroup v-if="s.id === copyTargetSchemeId" :label="s.name">
+              <optgroup v-if="s.id === copyPatternsState.targetSchemeId" :label="s.name">
                 <option v-for="l in s.layers" :key="l.id" :value="l.id">
                   {{ l.name }}
                 </option>
@@ -264,17 +280,17 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
           <div class="flex-between" style="margin-bottom: 6px;">
             <label>选择纹线（不选则全部复制）</label>
             <button class="btn btn-sm btn-secondary" @click="selectAllPatterns">
-              {{ copyPatternIds.length === allPatterns.length ? '取消全选' : '全选' }}
+              {{ copyPatternsState.patternIds.length === allPatterns.length ? '取消全选' : '全选' }}
             </button>
           </div>
           <div class="pattern-picker">
             <div
               v-for="p in allPatterns"
               :key="p.id"
-              :class="['pattern-picker-item', { selected: copyPatternIds.includes(p.id) }]"
+              :class="['pattern-picker-item', { selected: copyPatternsState.patternIds.includes(p.id) }]"
               @click="togglePattern(p.id)"
             >
-              <input type="checkbox" :checked="copyPatternIds.includes(p.id)" @click.stop />
+              <input type="checkbox" :checked="copyPatternsState.patternIds.includes(p.id)" @click.stop />
               <span class="pattern-color-swatch" :style="{ backgroundColor: p.color }"></span>
               <div class="pattern-picker-info">
                 <div class="pp-name">{{ p.name }}</div>
@@ -285,13 +301,13 @@ const tabs: { key: TabKey; label: string; icon: string; badge?: string; badgeCol
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="copyPatternModalVisible = false">取消</button>
+        <button class="btn btn-secondary" @click="copyPatternsModal.close()" :disabled="copyPatternsSubmit.submitting">取消</button>
         <button
           class="btn btn-primary"
           @click="executeCopy"
-          :disabled="!copySourceVersionId || !copyTargetSchemeId"
+          :disabled="!copyPatternsState.sourceVersionId || !copyPatternsState.targetSchemeId || copyPatternsSubmit.submitting"
         >
-          复制 {{ copyPatternIds.length > 0 ? copyPatternIds.length : allPatterns.length }} 条纹线
+          {{ copyPatternsSubmit.submitting ? '复制中...' : `复制 ${copyPatternsState.patternIds.length > 0 ? copyPatternsState.patternIds.length : allPatterns.length} 条纹线` }}
         </button>
       </div>
     </div>
