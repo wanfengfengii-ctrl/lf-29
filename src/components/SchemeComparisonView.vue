@@ -141,7 +141,9 @@ function formatArea(area: number): string {
                   <td style="padding: 8px 14px; color: #3d2914;">{{ item.patternName }}</td>
                   <td style="padding: 8px 14px;">
                     <div class="flex gap-8" style="align-items: center;">
-                      <span style="width: 14px; height: 14px; border-radius: 3px; border: 1px solid #d4c8b8; background: {{ item.color }};"></span>
+                      <span
+                        :style="{ width: '14px', height: '14px', borderRadius: '3px', border: '1px solid #d4c8b8', backgroundColor: item.color }"
+                      ></span>
                       <span>{{ item.colorName }}</span>
                     </div>
                   </td>

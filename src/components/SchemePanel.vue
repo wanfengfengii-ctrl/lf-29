@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMaskStore } from '@/stores/mask'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+import type { ProcessScheme } from '@/types'
 
 const store = useMaskStore()
 
@@ -14,9 +15,9 @@ const duplicateSourceId = ref('')
 const duplicateNewName = ref('')
 const importMessage = ref('')
 
-const faceCarvingLayers = computed(() => {
-  return store.orderedLayers.filter(l => l.type === 'face_carving')
-})
+function countFaceCarving(scheme: ProcessScheme): number {
+  return scheme.layers.filter(l => l.type === 'face_carving').length
+}
 
 function handleCreate() {
   if (!newSchemeName.value.trim()) return
@@ -106,8 +107,8 @@ function formatDate(ts: number): string {
           {{ scheme.layers.length }} 个工序 · 更新于 {{ formatDate(scheme.updatedAt) }}
         </div>
         <div class="scheme-card-meta">
-          <span v-if="faceCarvingLayers.length > 0" style="color: #8b4513;">
-            {{ faceCarvingLayers.length }} 套开脸配色
+          <span v-if="countFaceCarving(scheme) > 0" style="color: #8b4513;">
+            {{ countFaceCarving(scheme) }} 套开脸配色
           </span>
           <span v-else class="text-muted">暂无开脸方案</span>
         </div>

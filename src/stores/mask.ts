@@ -333,17 +333,28 @@ export const useMaskStore = defineStore('mask', () => {
       }
     }
 
+    const oldLayerIds = scheme.layers.map(l => l.id)
+    const idMap = new Map<string, string>()
     scheme.id = generateId()
     scheme.createdAt = now()
     scheme.updatedAt = now()
-    scheme.layers = scheme.layers.map(l => ({
-      ...l,
-      id: generateId(),
-      patterns: l.patterns.map(p => ({ ...p, id: generateId() })),
-      createdAt: now(),
-      updatedAt: now()
-    }))
-    scheme.layerOrder = scheme.layers.map(l => l.id)
+    scheme.layers = scheme.layers.map(l => {
+      const newId = generateId()
+      idMap.set(l.id, newId)
+      return {
+        ...l,
+        id: newId,
+        patterns: l.patterns.map(p => ({ ...p, id: generateId() })),
+        createdAt: now(),
+        updatedAt: now()
+      }
+    })
+    const originalLayerOrder = scheme.layerOrder && scheme.layerOrder.length > 0
+      ? scheme.layerOrder
+      : oldLayerIds
+    scheme.layerOrder = originalLayerOrder
+      .map(oldId => idMap.get(oldId))
+      .filter((id): id is string => !!id)
 
     mask.schemes.push(scheme)
     mask.updatedAt = now()
